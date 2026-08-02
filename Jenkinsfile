@@ -97,7 +97,7 @@ pipeline {
                         echo "Sleeping for 120 seconds..."
                         sleep 120
 
-                        mvn deploy -Dmaven.test.skip=true -s $MAVEN_SETTINGS
+                        mvn -X deploy -Dmaven.test.skip=true -s $MAVEN_SETTINGS
                         '''
                     }
 
@@ -125,7 +125,6 @@ pipeline {
 
                     echo '<--------------- Docker Publish Skipped --------------->'
                     echo 'JFrog has been removed. Configure Docker Hub or Nexus Docker Registry later.'
-
                 }
             }
         }
