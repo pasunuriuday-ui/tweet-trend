@@ -1,5 +1,5 @@
 def imageName = 'ttrend'
-def version   = '2.0.2'
+def version = '2.0.2'
 
 pipeline {
     agent {
@@ -19,7 +19,16 @@ pipeline {
                 echo "------------ build started ---------"
 
                 configFileProvider([configFile(fileId: 'maven-settings', variable: 'MAVEN_SETTINGS')]) {
-                    sh 'mvn clean package -Dmaven.test.skip=true -s $MAVEN_SETTINGS'
+
+                    sh '''
+                    echo "===== Maven Settings ====="
+                    cat $MAVEN_SETTINGS
+                    echo "=========================="
+
+                    mvn -s $MAVEN_SETTINGS help:effective-settings
+
+                    mvn clean package -Dmaven.test.skip=true -s $MAVEN_SETTINGS
+                    '''
                 }
 
                 echo "------------ build completed ---------"
@@ -77,7 +86,19 @@ pipeline {
                     echo '<--------------- Nexus Jar Publish Started --------------->'
 
                     configFileProvider([configFile(fileId: 'maven-settings', variable: 'MAVEN_SETTINGS')]) {
-                        sh 'mvn deploy -Dmaven.test.skip=true -s $MAVEN_SETTINGS'
+
+                        sh '''
+                        echo "===== Maven Settings Used During Deploy ====="
+                        cat $MAVEN_SETTINGS
+                        echo "============================================"
+
+                        mvn -s $MAVEN_SETTINGS help:effective-settings
+
+                        echo "Sleeping for 120 seconds..."
+                        sleep 120
+
+                        mvn deploy -Dmaven.test.skip=true -s $MAVEN_SETTINGS
+                        '''
                     }
 
                     echo '<--------------- Nexus Jar Publish Completed --------------->'
@@ -103,7 +124,7 @@ pipeline {
                 script {
 
                     echo '<--------------- Docker Publish Skipped --------------->'
-                    echo 'JFrog removed. Configure Docker Hub or Nexus Docker Registry later.'
+                    echo 'JFrog has been removed. Configure Docker Hub or Nexus Docker Registry later.'
 
                 }
             }
