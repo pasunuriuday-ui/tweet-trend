@@ -116,11 +116,11 @@
 	</build>
 
 	<distributionManagement>
-		<repository>
-			<id>dev</id>
-			<url>file://jarstaging</url>
-		</repository>
-	</distributionManagement>
+    <repository>
+        <id>nexus</id>
+        <url>http://54.211.102.179:8081/repository/maven-hosted/</url>
+    </repository>
+</distributionManagement>
 
 
 </project>

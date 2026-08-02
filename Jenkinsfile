@@ -1,114 +1,125 @@
-def registry = 'https://valaxy02.jfrog.io'
-def imageName = 'valaxy02.jfrog.io/valaxy-docker/ttrend'
+def imageName = 'ttrend'
 def version   = '2.0.2'
-pipeline{
+
+pipeline {
     agent {
         node {
             label "valaxy"
         }
     }
+
     environment {
         PATH = "/opt/apache-maven-3.8.7/bin:$PATH"
     }
+
     stages {
+
         stage('build') {
-            steps{
+            steps {
                 echo "------------ build started ---------"
-                sh 'mvn clean deploy -Dmaven.test.skip=true'
+
+                configFileProvider([configFile(fileId: 'maven-settings', variable: 'MAVEN_SETTINGS')]) {
+                    sh 'mvn clean package -Dmaven.test.skip=true -s $MAVEN_SETTINGS'
+                }
+
                 echo "------------ build completed ---------"
+            }
         }
-      }
 
         stage('Unit Test') {
             steps {
-                echo '<--------------- Unit Testing started  --------------->'
+                echo '<--------------- Unit Testing started --------------->'
                 sh 'mvn surefire-report:report'
-                echo '<------------- Unit Testing stopped  --------------->'
+                echo '<--------------- Unit Testing stopped --------------->'
             }
         }
 
-       stage ("Sonar Analysis") {
+        stage("Sonar Analysis") {
             environment {
-               scannerHome = tool 'valaxy-sonarscanner'
+                scannerHome = tool 'valaxy-sonarscanner'
             }
+
             steps {
-                echo '<--------------- Sonar Analysis started  --------------->'
-                withSonarQubeEnv('valaxy-sonarqube-server') {    
+                echo '<--------------- Sonar Analysis started --------------->'
+
+                withSonarQubeEnv('valaxy-sonarqube-server') {
                     sh "${scannerHome}/bin/sonar-scanner"
-                echo '<--------------- Sonar Analysis stopped  --------------->'
-                }    
-               
-            }   
+                }
+
+                echo '<--------------- Sonar Analysis stopped --------------->'
+            }
         }
+
         stage("Quality Gate") {
             steps {
                 script {
-                  echo '<--------------- Sonar Gate Analysis Started --------------->'
-                    timeout(time: 1, unit: 'HOURS'){
-                       def qg = waitForQualityGate()
-                        if(qg.status !='OK') {
+
+                    echo '<--------------- Sonar Gate Analysis Started --------------->'
+
+                    timeout(time: 1, unit: 'HOURS') {
+
+                        def qg = waitForQualityGate()
+
+                        if (qg.status != 'OK') {
                             error "Pipeline failed due to quality gate failures: ${qg.status}"
                         }
-                    }  
-                  echo '<--------------- Sonar Gate Analysis Ends  --------------->'
+                    }
+
+                    echo '<--------------- Sonar Gate Analysis Ends --------------->'
                 }
             }
         }
 
-         stage("Jar Publish") {
-        steps {
-            script {
-                    echo '<--------------- Jar Publish Started --------------->'
-                     def server = Artifactory.newServer url:registry+"/artifactory" ,  credentialsId:"jfrog-access"
-                     def properties = "buildid=${env.BUILD_ID},commitid=${GIT_COMMIT}";
-                     def uploadSpec = """{
-                          "files": [
-                            {
-                              "pattern": "jarstaging/(*)",
-                              "target": "twittertrend-libs-release-local/{1}",
-                              "flat": "false",
-                              "props" : "${properties}",
-                              "exclusions": [ "*.sha1", "*.md5"]
-                            }
-                         ]
-                     }"""
-                     def buildInfo = server.upload(uploadSpec)
-                     buildInfo.env.collect()
-                     server.publishBuildInfo(buildInfo)
-                     echo '<--------------- Jar Publish Ended --------------->'  
-            
-            }
-        }   
-    }
-stage(" Docker Build ") {
-      steps {
-        script {
-           echo '<--------------- Docker Build Started --------------->'
-           app = docker.build(imageName+":"+version)
-           echo '<--------------- Docker Build Ends --------------->'
-        }
-      }
-    }
+        stage("Jar Publish") {
+            steps {
+                script {
 
-    stage (" Docker Publish "){
-        steps {
-            script {
-               echo '<--------------- Docker Publish Started --------------->'  
-                docker.withRegistry(registry, 'jfrog-access'){
-                    app.push()
-                }    
-               echo '<--------------- Docker Publish Ended --------------->'  
+                    echo '<--------------- Nexus Jar Publish Started --------------->'
+
+                    configFileProvider([configFile(fileId: 'maven-settings', variable: 'MAVEN_SETTINGS')]) {
+                        sh 'mvn deploy -Dmaven.test.skip=true -s $MAVEN_SETTINGS'
+                    }
+
+                    echo '<--------------- Nexus Jar Publish Completed --------------->'
+                }
+            }
+        }
+
+        stage(" Docker Build ") {
+            steps {
+                script {
+
+                    echo '<--------------- Docker Build Started --------------->'
+
+                    app = docker.build("${imageName}:${version}")
+
+                    echo '<--------------- Docker Build Ends --------------->'
+                }
+            }
+        }
+
+        stage(" Docker Publish ") {
+            steps {
+                script {
+
+                    echo '<--------------- Docker Publish Skipped --------------->'
+                    echo 'JFrog removed. Configure Docker Hub or Nexus Docker Registry later.'
+
+                }
+            }
+        }
+
+        stage(" Deploy ") {
+            steps {
+                script {
+
+                    echo '<--------------- Deploy Started --------------->'
+
+                    sh 'helm install twittertrend-2.0.2 ttrend'
+
+                    echo '<--------------- Deploy Ends --------------->'
+                }
             }
         }
     }
-         stage(" Deploy ") {
-          steps {
-            script {
-               echo '<--------------- Deploy Started --------------->'
-               sh 'helm install twittertrend-2.0.2 ttrend'
-               echo '<--------------- Deploy Ends --------------->'
-            }
-          }
-        }    
-    }
-    }
+}
