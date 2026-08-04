@@ -4,7 +4,7 @@ def version = '2.0.2'
 pipeline {
     agent {
         node {
-            label "valaxy"
+            label "maven"
         }
     }
 
@@ -112,7 +112,7 @@ pipeline {
 
                     echo '<--------------- Docker Build Started --------------->'
 
-                    app = docker.build("${imageName}:${version}")
+                    def app = docker.build("${imageName}:${version}")
 
                     echo '<--------------- Docker Build Ends --------------->'
                 }
